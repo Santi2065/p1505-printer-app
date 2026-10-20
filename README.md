@@ -144,13 +144,6 @@ kind of firmware upload, so they will likely work after small changes: the USB
 ID, the device ID match, and the firmware file name. Untested. Reports and
 patches are welcome.
 
-## Not supported
-
-- **4 bits per pixel.** `@PJL INFO CONFIG` lists it, but on this printer it
-  printed garbage. See the spec, section 11.
-- **Network printing.** The driver only talks to the printer over USB. A
-  P1505n connected by USB should work but is untested.
-
 ## Credits
 
 The protocol facts come from reading [foo2zjs](https://github.com/koenkooi/foo2zjs)

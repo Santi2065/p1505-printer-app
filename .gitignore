@@ -1,0 +1,14 @@
+build/
+__pycache__/
+# Only the fixtures listed in README are tracked; everything else in ref/ is scratch.
+ref/*
+!ref/hplip-Normal.bin
+!ref/t.ps
+!ref/t.pdf
+!ref/duplex.ps
+!ref/duplex.pdf
+!ref/calibration.ps
+!ref/calibration.pdf
+# HP firmware is proprietary: never commit it.
+*.fw
+*.fw.gz

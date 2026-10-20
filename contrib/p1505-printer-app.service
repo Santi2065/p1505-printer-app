@@ -1,0 +1,9 @@
+[Unit]
+Description=HP LaserJet P1505 Printer Application (free XQX driver)
+
+[Service]
+ExecStart=%h/.local/bin/p1505-printer-app server
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

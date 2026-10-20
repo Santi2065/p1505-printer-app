@@ -1,0 +1,30 @@
+%!PS
+% A4 calibration: 595.28 x 841.89 pt. 1 mm = 2.83465 pt
+/mm { 2.83465 mul } def
+<< /PageSize [595.28 841.89] >> setpagedevice
+0.3 setlinewidth
+% Frame 10 mm from every edge: must measure 190 x 277 mm
+10 mm 10 mm 190 mm 277 mm rectstroke
+% Dashed frame 5 mm from every edge (printable area starts ~4 mm)
+[2 2] 0 setdash 5 mm 5 mm 200 mm 287 mm rectstroke [] 0 setdash
+% Center cross: should be 105 mm from left, 148.5 mm from top
+105 mm 138.5 mm moveto 0 20 mm rlineto stroke
+95 mm 148.5 mm moveto 20 mm 0 rlineto stroke
+% Rulers from the top and left paper edges, ticks every mm from 5 to 30 mm
+0.2 setlinewidth
+5 1 30 { /i exch def
+  /len i 5 mod 0 eq { 4 mm } { 2 mm } ifelse def
+  60 mm 297 i sub mm moveto len 0 rlineto stroke
+  i mm 60 mm moveto 0 len rlineto stroke } for
+/Helvetica findfont 7 scalefont setfont
+5 5 30 { /i exch def
+  65 mm 297 i sub mm 1 sub moveto i 3 string cvs show
+  i mm 1 sub 65 mm moveto i 3 string cvs show } for
+/Helvetica-Bold findfont 14 scalefont setfont
+30 mm 230 mm moveto (A4 calibration - HP P1505 printer app) show
+/Helvetica findfont 10 scalefont setfont
+30 mm 222 mm moveto (Solid frame: 10 mm from every edge, 190 x 277 mm) show
+30 mm 216 mm moveto (Dashed frame: 5 mm from every edge) show
+30 mm 210 mm moveto (Cross: 105 mm from the left edge, 148.5 mm from the top edge) show
+30 mm 204 mm moveto (Rulers: mm from the paper edge, top \(x=60mm\) and left \(y=60mm\)) show
+showpage

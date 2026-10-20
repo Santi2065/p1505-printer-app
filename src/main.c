@@ -778,6 +778,7 @@ static pappl_system_t *system_cb(int num_options, cups_option_t *options, void *
     return NULL;
 
   papplSystemAddListeners(system, "localhost");   // local only, not on the network
+  papplSystemSetHostName(system, "localhost");    // so DNS-SD advertises on loopback only; share via CUPS
   papplSystemSetPrinterDrivers(system, 1, drivers, autoadd_cb, NULL, driver_cb, NULL);
   papplSystemAddMIMEFilter(system, "application/pdf", "application/vnd.hp-xqx", filter_gs, NULL);
   papplSystemAddMIMEFilter(system, "application/postscript", "application/vnd.hp-xqx", filter_gs, NULL);

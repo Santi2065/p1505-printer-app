@@ -4,6 +4,8 @@
 #include "xqx.h"
 #include <pappl/pappl.h>
 #include <limits.h>
+#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,38 +164,108 @@ static bool page_begin(p15_job_t *j, unsigned w, unsigned h)
   return j->gray != NULL;
 }
 
-// Serpentine Floyd-Steinberg from 8-bit gray to 1-bit (1 = black). Pure black
-// and white pixels (text, lines) pass through unchanged; only grays diffuse.
-static void dither_fs(const unsigned char *src, unsigned sw, unsigned cx, unsigned cy,
-                      unsigned w, unsigned h, unsigned char *dst, unsigned bpl)
+// Clustered-dot halftone from 8-bit gray to 1-bit (1 = black). Error diffusion
+// printed photos as grain: the engine cannot place isolated half-dots evenly,
+// so grays grow round dots on a SCREEN_LPI grid instead. Pure black and white
+// (text, lines) are never screened. A 45 degree screen (106 lpi) was tried on
+// 2026-10-24 and printed white blotches and artifacts on this engine.
+#define SCREEN_LPI 100      // calibration knob: lower = smoother but coarser
+#define SCREEN_MAX 12       // cell width at 1200 dpi
+
+static void dither_screen(const unsigned char *src, unsigned sw, unsigned cx, unsigned cy,
+                          unsigned w, unsigned h, unsigned char *dst, unsigned bpl, int xres)
 {
-  int *err = calloc(2 * (w + 2), sizeof(int));
-  if (!err) return;
-  int *cur = err + 1, *nxt = err + w + 3;
+  unsigned cw = (unsigned)xres / SCREEN_LPI, ch = 600 / SCREEN_LPI, n = cw * ch;
+  double spot[SCREEN_MAX * SCREEN_MAX / 2];
+  unsigned char th[SCREEN_MAX * SCREEN_MAX / 2];
+  for (unsigned i = 0; i < n; i ++)        // dot centre at the cell corner
+    spot[i] = cos(2 * M_PI * ((i % cw) + 0.5) / cw) + cos(2 * M_PI * ((i / cw) + 0.5) / ch);
+  for (unsigned i = 0; i < n; i ++)        // rank = how early the pixel turns black
+  {
+    unsigned r = 0;
+    for (unsigned k = 0; k < n; k ++)
+      r += spot[k] > spot[i] || (spot[k] == spot[i] && k < i);
+    th[i] = (unsigned char)((r * 2 + 1) * 255 / (2 * n));
+  }
+
+  for (unsigned y = 0; y < h; y ++)
+  {
+    const unsigned char *row = src + (size_t)(y + cy) * sw + cx;
+    const unsigned char *t = th + ((y + cy) % ch) * cw;
+    unsigned char *out = dst + (size_t)y * bpl;
+    for (unsigned x = 0; x < w; x ++)
+      if (255 - row[x] > t[(x + cx) % cw])
+        out[x >> 3] |= (unsigned char)(0x80 >> (x & 7));
+  }
+}
+
+// Green-noise halftone: Levien's output-dependent feedback (Floyd-Steinberg
+// whose threshold is pulled by already printed neighbours) on square 600-dpi
+// cells, plus threshold jitter (Lau & Arce) to break up worms. Black clumps
+// into random clusters the engine can print. Clusters have more edge than round
+// dots, so toner spread darkens them: GREEN_GAMMA lightens the midtones back.
+#ifndef GREEN_H
+#define GREEN_H 1.0         // calibration knob: 0 = plain FS, higher = bigger clusters
+#endif
+#define GREEN_JITTER 40     // threshold noise, 0..255
+#define GREEN_GAMMA 1.4     // calibration knob: picked on paper 2026-10-24 (1.7 = more contrast)
+
+static void dither_green(const unsigned char *src, unsigned sw, unsigned cx, unsigned cy,
+                         unsigned w, unsigned h, unsigned char *dst, unsigned bpl, int xres)
+{
+  unsigned s = xres == 1200 ? 2 : 1, wc = (w + s - 1) / s;          // cells per row
+  float *err = calloc(2 * (wc + 4), sizeof(float));
+  unsigned char *prev = calloc(wc + 4, 1), *cur = calloc(wc + 4, 1); // 1 = black
+  if (!err || !prev || !cur) { free(err); free(prev); free(cur); return; }
+  float *e0 = err + 2, *e1 = err + wc + 6;
+  uint32_t rnd = 2463534242u;
+  float tone[256];                                   // gray -> corrected darkness
+  for (int i = 0; i < 256; i ++)
+    tone[i] = 255 * powf((255 - i) / 255.0f, GREEN_GAMMA);
 
   for (unsigned y = 0; y < h; y ++)
   {
     const unsigned char *row = src + (size_t)(y + cy) * sw + cx;
     unsigned char *out = dst + (size_t)y * bpl;
-    bool ltr = (y & 1) == 0;
-    int dir = ltr ? 1 : -1;
-    memset(nxt - 1, 0, (w + 2) * sizeof(int));
-    for (unsigned k = 0; k < w; k ++)
+    int dir = (y & 1) ? -1 : 1;
+    memset(e1 - 2, 0, (wc + 4) * sizeof(float));
+    memset(cur, 0, wc + 4);
+    for (unsigned k = 0; k < wc; k ++)
     {
-      unsigned x = ltr ? k : w - 1 - k;
-      int v = row[x] + cur[x] / 16;
-      int q = v < 128 ? 0 : 255;
-      int e = v - q;
-      if (!q) out[x >> 3] |= (unsigned char)(0x80 >> (x & 7));
-      if (row[x] == 0 || row[x] == 255) continue;     // keep crisp edges crisp
-      cur[(int)x + dir] += e * 7;
-      nxt[(int)x - dir] += e * 3;
-      nxt[x]            += e * 5;
-      nxt[(int)x + dir] += e;
+      int c = (int)((y & 1) ? wc - 1 - k : k);
+      unsigned x0 = (unsigned)c * s, n = x0 + s <= w ? s : w - x0, sum = 0, hard = 1;
+      for (unsigned i = 0; i < n; i ++)
+      {
+        sum += row[x0 + i];
+        hard &= row[x0 + i] == 0 || row[x0 + i] == 255;
+      }
+      if (hard)                                        // text and lines stay crisp
+      {
+        for (unsigned i = 0; i < n; i ++)
+          if (!row[x0 + i]) out[(x0 + i) >> 3] |= (unsigned char)(0x80 >> ((x0 + i) & 7));
+        cur[c + 2] = sum * 2 < 255 * n;
+        continue;
+      }
+      rnd ^= rnd << 13; rnd ^= rnd >> 17; rnd ^= rnd << 5;
+      float jitter = GREEN_JITTER * ((float)(rnd & 0xffff) / 65535 - 0.5f);
+      float fb = (cur[c + 2 - dir] + prev[c + 1] + prev[c + 2] + prev[c + 3]) / 4.0f;
+      float v = tone[(sum + n / 2) / n] + e0[c];
+      bool black = v + GREEN_H * 255 * (fb - 0.5f) + jitter >= 128;
+      float e = v - (black ? 255 : 0);
+      if (black)
+      {
+        cur[c + 2] = 1;
+        for (unsigned i = 0; i < n; i ++) out[(x0 + i) >> 3] |= (unsigned char)(0x80 >> ((x0 + i) & 7));
+      }
+      e0[c + dir] += e * 7 / 16;
+      e1[c - dir] += e * 3 / 16;
+      e1[c]       += e * 5 / 16;
+      e1[c + dir] += e / 16;
     }
-    int *t = cur; cur = nxt; nxt = t;
+    float *t = e0; e0 = e1; e1 = t;
+    unsigned char *u = prev; prev = cur; cur = u;
   }
-  free(err);
+  free(err); free(prev); free(cur);
 }
 
 static bool load_firmware(pappl_job_t *job, pappl_device_t *device);
@@ -240,7 +312,10 @@ static bool page_end(p15_job_t *j, pappl_job_t *job, pappl_device_t *device)
 
   unsigned char *bits = calloc(bpl, h ? h : 1);
   if (!bits) return false;
-  dither_fs(j->gray, j->w, (unsigned)sx, (unsigned)sy, w, h, bits, bpl);
+  // Green noise is the default (smoother on paper); P1505_HALFTONE=screen in the
+  // service environment brings back the ordered 0 degree screen.
+  const char *ht = getenv("P1505_HALFTONE");
+  (ht && !strcmp(ht, "screen") ? dither_screen : dither_green)(j->gray, j->w, (unsigned)sx, (unsigned)sy, w, h, bits, bpl, j->xj.xres);
 
   xqx_buf_t *pg = j->pages + j->num_pages;
   bool ok = xqx_page(pg, &j->xj, bits, w, h, bpl, rot, pause);

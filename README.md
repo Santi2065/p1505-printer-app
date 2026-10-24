@@ -16,7 +16,7 @@ adds what the Linux drivers never had for this model:
 | Printer status | limited | paper out, jam, door open, toner low/empty, offline |
 | JBIG compression | HP proprietary plugin | jbigkit (free) |
 | Position calibration | no | `print-offset-x/y`, tenths of mm |
-| Gray / photos | n/a | Floyd–Steinberg error diffusion; text stays solid black |
+| Gray / photos | n/a | green-noise halftone tuned on paper for this engine; text stays solid black |
 | Runs as | root (for the plugin) | your user |
 | Printers supported | ~3000 HP models | **P1505 only** (see "Other models") |
 
@@ -34,7 +34,7 @@ after power-on.
 
 ```
 PDF/PS ──gs (8-bit gray, 1200x600)──┐
-PWG raster (from CUPS/IPP) ─────────┤→ crop + offset → error diffusion → XQX/JBIG → USB
+PWG raster (from CUPS/IPP) ─────────┤→ crop + offset → green-noise halftone → XQX/JBIG → USB
                                     │   (duplex: fronts, pause, backs reversed + rotated)
 ```
 
@@ -123,6 +123,21 @@ powers on. Run `sudo systemctl mask configure-printer@.service` to stop that.
 
 You can set defaults in the web interface, or with
 `p1505-printer-app modify -d <printer> -o economode-default=on`.
+
+### Halftoning
+
+Photos and gray fills use green-noise halftoning: error diffusion with
+output-dependent feedback (Levien) on square 600-dpi cells, with threshold
+jitter (Lau & Arce). It gives random clusters of toner instead of single
+dots, which the engine prints cleanly, with smooth gradients and no visible
+grid. Floyd–Steinberg printed photos as grain, and a 45° clustered-dot screen
+left white blotches. Pure black and white, such as text and lines, are never
+halftoned.
+
+`GREEN_GAMMA` in `src/main.c` lightens midtones to make up for toner spread.
+The value was chosen by eye with the test sheets. To use the older ordered
+0° screen (100 lpi), set `P1505_HALFTONE=screen` in the service environment.
+`ref/grays.pdf` is a 0–100 % gray ramp for checking tone.
 
 ### Calibrating the position
 

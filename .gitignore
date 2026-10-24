@@ -12,3 +12,5 @@ ref/*
 # HP firmware is proprietary: never commit it.
 *.fw
 *.fw.gz
+!ref/grays.ps
+!ref/grays.pdf

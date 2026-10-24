@@ -1,0 +1,22 @@
+%!PS-Adobe-3.0
+%%BoundingBox: 0 0 595 842
+%%Title: Gray ramp: 0-100 % in 5 % steps, for tone calibration
+%%EndComments
+<< /PageSize [595.28 841.89] >> setpagedevice
+/Helvetica-Bold findfont 14 scalefont setfont
+50 800 moveto (Gray ramp - % black requested) show
+/Helvetica findfont 11 scalefont setfont
+% 21 patches, 3 columns x 7 rows, 150 x 90 pt
+0 1 20 {
+  /i exch def
+  /col i 7 idiv def /row i 7 mod def
+  /x 50 col 170 mul add def /y 690 row 100 mul sub def
+  1 i 0.05 mul sub setgray x y 150 80 rectfill
+  0 setgray x y 150 80 rectstroke
+  x y 12 sub moveto i 5 mul 3 string cvs show ( %) show
+} for
+% continuous wedge along the bottom
+0 1 499 { /k exch def 1 k 499 div sub setgray 50 k add 30 1 30 rectfill } for
+0 setgray 50 30 500 30 rectstroke
+showpage
+%%EOF

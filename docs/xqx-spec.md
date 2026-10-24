@@ -496,3 +496,4 @@ Uncertain points:
 - `@PJL SET RET=OFF|LIGHT|MEDIUM|DARK` (2026-10-24): same text, 0.25/0.5 pt diagonals and circles printed at all four levels looked identical at 1200x600. The engine probably ignores RET for host-rendered data. The driver keeps MEDIUM.
 - Halftoning (2026-10-24): Floyd–Steinberg printed photos as grain, and a 45° 106 lpi clustered-dot screen left white blotches. A 0° 100 lpi screen was clean, but its grid showed like woven fabric. Green noise on 600-dpi cells with a 1.4 midtone curve was preferred.
 - CUPS 2.4 does not pass vendor attributes such as `resolution-enhancement` from an IPP Everywhere queue to the app. Set them as printer defaults in the app instead.
+- Edge-preserving toner saving (2026-10-24): solid 0.3 mm edges, with the inside of large type, solids and grays at 60 %. It saved 45 % on a heavy test page, but the user found the hollow-looking large type ugly. Not kept. EconoMode stays the printer's own PJL ECONOMODE.

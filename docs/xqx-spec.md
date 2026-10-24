@@ -493,3 +493,6 @@ Uncertain points:
 - `@PJL USTATUS JOB = ON` in the header: printer sends JOB END after the last back page.
 - `@PJL INFO SUPPLIES` reports PercentRemaining / PagesRemaining even with a non-HP cartridge.
 - Calibration on the author's unit: image landed 1 mm right and 1 mm high, corrected with print-offset-x=-10, print-offset-y=10. Other units will differ; the driver default is 0.
+- `@PJL SET RET=OFF|LIGHT|MEDIUM|DARK` (2026-10-24): same text, 0.25/0.5 pt diagonals and circles printed at all four levels looked identical at 1200x600. The engine probably ignores RET for host-rendered data. The driver keeps MEDIUM.
+- Halftoning (2026-10-24): Floyd–Steinberg printed photos as grain, and a 45° 106 lpi clustered-dot screen left white blotches. A 0° 100 lpi screen was clean, but its grid showed like woven fabric. Green noise on 600-dpi cells with a 1.4 midtone curve was preferred.
+- CUPS 2.4 does not pass vendor attributes such as `resolution-enhancement` from an IPP Everywhere queue to the app. Set them as printer defaults in the app instead.
